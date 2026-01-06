@@ -7,6 +7,7 @@ import { ChatInterface } from "@/components/ChatInterface";
 import { PreviewPanel } from "@/components/PreviewPanel";
 import { exportWebsite } from "@/lib/exportWebsite";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Message {
   id: string;
@@ -20,6 +21,10 @@ interface GeneratedCode {
   js: string;
 }
 
+interface CurrentPrompt {
+  text: string;
+}
+
 export default function Index() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,6 +33,8 @@ export default function Index() {
     css: "",
     js: "",
   });
+  const [currentPrompt, setCurrentPrompt] = useState<CurrentPrompt | null>(null);
+  const { user } = useAuth();
 
   const handleGenerate = async (prompt: string) => {
     // Add user message
@@ -38,6 +45,7 @@ export default function Index() {
     };
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+    setCurrentPrompt({ text: prompt });
 
     try {
       const { data, error } = await supabase.functions.invoke("generate-website", {
@@ -102,6 +110,38 @@ export default function Index() {
     }
   };
 
+  const handleSave = async () => {
+    if (!user) {
+      toast.error("Please sign in to save websites");
+      return;
+    }
+
+    if (!generatedCode.html && !generatedCode.css) {
+      toast.error("No website to save");
+      return;
+    }
+
+    try {
+      const websiteName = currentPrompt?.text.slice(0, 50) || "My Website";
+      
+      const { error } = await supabase.from("saved_websites").insert({
+        user_id: user.id,
+        name: websiteName,
+        prompt: currentPrompt?.text || "",
+        html: generatedCode.html,
+        css: generatedCode.css,
+        js: generatedCode.js,
+      });
+
+      if (error) throw error;
+
+      toast.success("Website saved to dashboard!");
+    } catch (error) {
+      console.error("Save error:", error);
+      toast.error("Failed to save website");
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Toaster position="top-center" theme="dark" />
@@ -134,6 +174,8 @@ export default function Index() {
             css={generatedCode.css}
             js={generatedCode.js}
             onExport={handleExport}
+            onSave={handleSave}
+            canSave={!!user && !!(generatedCode.html || generatedCode.css)}
           />
         </motion.div>
       </main>
