@@ -5,34 +5,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const systemPrompt = `You are an expert web developer AI that generates beautiful, modern, responsive websites. When given a description, you MUST generate complete HTML, CSS, and JavaScript code.
+const systemPrompt = `You are an expert web developer. Generate a SIMPLE, CONCISE website.
 
-CRITICAL: You MUST respond with ONLY valid JSON in this exact format:
-{
-  "html": "<your HTML body content here>",
-  "css": "<your CSS styles here>",
-  "js": "<your JavaScript code here>",
-  "description": "Brief description of what you built"
-}
+RESPOND WITH ONLY THIS JSON FORMAT (no markdown):
+{"html":"<body content>","css":"<styles>","js":"<script>","description":"Brief description"}
 
-Guidelines for generating code:
-1. HTML should be semantic and accessible (use proper headings, alt text, ARIA labels)
-2. CSS should be modern (use flexbox/grid, CSS variables, smooth transitions)
-3. JavaScript should be vanilla JS, clean and well-commented
-4. Make designs visually stunning with:
-   - Beautiful color schemes (suggest modern palettes)
-   - Smooth animations and hover effects
-   - Proper spacing and typography
-   - Mobile-first responsive design
-5. Include realistic placeholder content
-6. Use modern fonts from Google Fonts (add the link in CSS as @import)
-
-IMPORTANT: 
-- Return ONLY the JSON object, no markdown code blocks
-- HTML should be the body content only (no <html>, <head>, or <body> tags)
-- CSS should be complete styles
-- JS should be functional and error-free
-- All code must work together seamlessly`;
+RULES:
+- Keep code MINIMAL and CLEAN - avoid excessive sections
+- HTML: semantic, body content only (no html/head/body tags)
+- CSS: modern with flexbox/grid, CSS variables, @import for Google Fonts
+- JS: vanilla, minimal, functional
+- Make it visually appealing but CONCISE
+- Maximum 3-4 sections for any website
+- Use placeholder images from picsum.photos`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -70,10 +55,10 @@ serve(async (req) => {
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Create a website based on this description: ${prompt}` },
+          { role: "user", content: `Create a simple website: ${prompt}. Keep it concise with 3-4 sections max.` },
         ],
         temperature: 0.7,
-        max_tokens: 8000,
+        max_tokens: 4000,
       }),
     });
 
@@ -133,17 +118,28 @@ serve(async (req) => {
     } catch (parseError) {
       console.error("Failed to parse AI response as JSON:", parseError);
       
-      // Try to extract code blocks from the response
-      const htmlMatch = content.match(/```html\n?([\s\S]*?)```/);
-      const cssMatch = content.match(/```css\n?([\s\S]*?)```/);
-      const jsMatch = content.match(/```(?:javascript|js)\n?([\s\S]*?)```/);
+      // Try to extract individual fields from truncated JSON
+      const htmlMatch = content.match(/"html"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+      const cssMatch = content.match(/"css"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+      const jsMatch = content.match(/"js"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+      
+      // Also try code block format
+      const htmlBlockMatch = content.match(/```html\n?([\s\S]*?)```/);
+      const cssBlockMatch = content.match(/```css\n?([\s\S]*?)```/);
+      const jsBlockMatch = content.match(/```(?:javascript|js)\n?([\s\S]*?)```/);
 
-      if (htmlMatch || cssMatch || jsMatch) {
+      const extractedHtml = htmlMatch?.[1] || htmlBlockMatch?.[1] || "";
+      const extractedCss = cssMatch?.[1] || cssBlockMatch?.[1] || "";
+      const extractedJs = jsMatch?.[1] || jsBlockMatch?.[1] || "";
+
+      if (extractedHtml || extractedCss) {
+        // Unescape the JSON string content
+        const unescape = (str: string) => str.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
         parsedContent = {
-          html: htmlMatch?.[1]?.trim() || "",
-          css: cssMatch?.[1]?.trim() || "",
-          js: jsMatch?.[1]?.trim() || "",
-          description: "Generated website from code blocks",
+          html: unescape(extractedHtml.trim()),
+          css: unescape(extractedCss.trim()),
+          js: unescape(extractedJs.trim()),
+          description: "Generated website",
         };
       } else {
         return new Response(
