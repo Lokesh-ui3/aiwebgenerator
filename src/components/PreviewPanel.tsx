@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Monitor, Tablet, Smartphone, Code, Eye, Download, Copy, Check } from "lucide-react";
+import { Monitor, Tablet, Smartphone, Code, Eye, Download, Copy, Check, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,8 @@ interface PreviewPanelProps {
   css: string;
   js: string;
   onExport: () => void;
+  onSave?: () => void;
+  canSave?: boolean;
 }
 
 type ViewportSize = "desktop" | "tablet" | "mobile";
@@ -22,7 +24,7 @@ const viewportSizes: Record<ViewportSize, { width: string; icon: React.ReactNode
   mobile: { width: "375px", icon: <Smartphone className="w-4 h-4" /> },
 };
 
-export function PreviewPanel({ html, css, js, onExport }: PreviewPanelProps) {
+export function PreviewPanel({ html, css, js, onExport, onSave, canSave }: PreviewPanelProps) {
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
@@ -92,6 +94,19 @@ export function PreviewPanel({ html, css, js, onExport }: PreviewPanelProps) {
                 </Button>
               ))}
             </div>
+          )}
+
+          {onSave && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onSave}
+              disabled={!canSave}
+              className="gap-2"
+            >
+              <Save className="w-4 h-4" />
+              Save
+            </Button>
           )}
 
           <Button
